@@ -349,9 +349,10 @@ const WINDOW_BUTTON_POSITION = {
 // non-macOS platforms.
 const NATIVE_OVERLAY_BUTTON_WIDTH = 144
 const APP_ICON_PATHS = [
-  path.join(APP_ROOT, 'public', 'apple-touch-icon.png'),
+  path.join(unpackedPathFor(APP_ROOT), 'public', 'apple-touch-icon.png'),
+  path.join(unpackedPathFor(APP_ROOT), 'dist', 'apple-touch-icon.png'),
   path.join(APP_ROOT, 'dist', 'apple-touch-icon.png'),
-  path.join(unpackedPathFor(APP_ROOT), 'dist', 'apple-touch-icon.png')
+  path.join(APP_ROOT, 'public', 'apple-touch-icon.png')
 ]
 
 let rendererTitleBarTheme = null
@@ -3346,8 +3347,13 @@ function registerPowerResumeListeners() {
   }
 }
 
-function getAppIconPath() {
-  return APP_ICON_PATHS.find(fileExists)
+function getAppIcon() {
+  for (const candidate of APP_ICON_PATHS) {
+    if (!fileExists(candidate)) continue
+    const image = nativeImage.createFromPath(candidate)
+    if (!image.isEmpty()) return image
+  }
+  return undefined
 }
 
 function sendOpenUpdatesRequested() {
@@ -5085,7 +5091,7 @@ function focusWindow(win) {
 }
 
 function spawnSecondaryWindow({ sessionId, watch, newSession } = {}) {
-  const icon = getAppIconPath()
+  const icon = getAppIcon()
   const win = new BrowserWindow({
     width: SESSION_WINDOW_MIN_WIDTH,
     height: SESSION_WINDOW_MIN_HEIGHT,
@@ -5156,7 +5162,7 @@ function createNewSessionWindow() {
 }
 
 function createWindow() {
-  const icon = getAppIconPath()
+  const icon = getAppIcon()
   mainWindow = new BrowserWindow({
     width: 1220,
     height: 800,

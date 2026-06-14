@@ -181,7 +181,8 @@
     "asarUnpack": [
       "**/*.node",
       "**/prebuilds/**",
-      "dist/**"
+      "dist/**",
+      "public/**"
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
