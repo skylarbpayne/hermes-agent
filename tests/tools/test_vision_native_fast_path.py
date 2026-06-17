@@ -139,6 +139,28 @@ class TestVisionAnalyzeNative:
         assert isinstance(result, dict)
         assert result.get("_multimodal") is True
 
+    def test_svg_is_rejected_before_native_multimodal_embed(self, tmp_path):
+        """Regression: never embed SVG as data:image/svg+xml in tool history.
+
+        OpenAI/Codex rejects SVG tool-result images with HTTP 400
+        ("supported image formats: jpeg/png/gif/webp"). Once embedded in
+        history, that unsupported data URL wedges every subsequent turn.
+        """
+        svg = tmp_path / "diagram.svg"
+        svg.write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">'
+            '<rect width="10" height="10" fill="red"/></svg>',
+            encoding="utf-8",
+        )
+        result = asyncio.get_event_loop().run_until_complete(
+            _vision_analyze_native(str(svg), "what is this?")
+        )
+        assert isinstance(result, str)
+        parsed = json.loads(result)
+        assert parsed.get("success") is False
+        assert "SVG files are vector/text assets" in parsed.get("error", "")
+        assert "data:image/svg+xml" not in result
+
     def test_oversized_image_resized_under_embed_cap(self, tmp_path):
         """Regression for the wedged-session incident (May 2026).
 

@@ -106,8 +106,21 @@ async def _validate_image_url_async(url: str) -> bool:
     return await async_is_safe_url(url)
 
 
+_PROVIDER_SUPPORTED_IMAGE_MIME_TYPES = frozenset({
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+})
+
+
 def _detect_image_mime_type(image_path: Path) -> Optional[str]:
-    """Return a MIME type when the file looks like a supported image."""
+    """Return a MIME type when the file looks like an image.
+
+    This intentionally detects SVG/BMP too so callers can reject them with a
+    clear local error instead of embedding unsupported bytes into conversation
+    history and causing provider-side HTTP 400 loops.
+    """
     with image_path.open("rb") as f:
         header = f.read(64)
 
@@ -126,6 +139,25 @@ def _detect_image_mime_type(image_path: Path) -> Optional[str]:
         if "<svg" in head:
             return "image/svg+xml"
     return None
+
+
+def _provider_supported_image_mime_type(mime_type: Optional[str]) -> bool:
+    return bool(mime_type and mime_type.lower() in _PROVIDER_SUPPORTED_IMAGE_MIME_TYPES)
+
+
+def _unsupported_image_mime_message(mime_type: Optional[str]) -> str:
+    if mime_type == "image/svg+xml":
+        return (
+            "SVG files are vector/text assets, but the vision providers only "
+            "accept JPEG, PNG, GIF, or WebP image bytes. Rasterize the SVG to "
+            "PNG first, or inspect the SVG text directly with read_file."
+        )
+    if mime_type == "image/bmp":
+        return (
+            "BMP files are not accepted by the configured vision providers. "
+            "Convert the image to PNG/JPEG/WebP first."
+        )
+    return "Only JPEG, PNG, GIF, or WebP files are supported for vision analysis."
 
 
 def _is_retryable_download_error(error: Exception) -> bool:
@@ -743,6 +775,11 @@ async def _vision_analyze_native(
                 "Only real image files are supported for vision analysis.",
                 success=False,
             )
+        if not _provider_supported_image_mime_type(detected_mime_type):
+            return tool_error(
+                _unsupported_image_mime_message(detected_mime_type),
+                success=False,
+            )
 
         image_data_url = _image_to_base64_data_url(
             temp_image_path, mime_type=detected_mime_type,
@@ -898,6 +935,8 @@ async def vision_analyze_tool(
         detected_mime_type = _detect_image_mime_type(temp_image_path)
         if not detected_mime_type:
             raise ValueError("Only real image files are supported for vision analysis.")
+        if not _provider_supported_image_mime_type(detected_mime_type):
+            raise ValueError(_unsupported_image_mime_message(detected_mime_type))
         
         # Convert image to base64 — send at full resolution first.
         # If the provider rejects it as too large, we auto-resize and retry.
