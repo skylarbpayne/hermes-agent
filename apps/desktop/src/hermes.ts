@@ -177,7 +177,9 @@ export async function listAllProfileSessions(
     ? `&exclude_sources=${encodeURIComponent(filter.excludeSources.join(','))}`
     : ''
 
+  const scopedProfile = profile === 'all' ? null : profile
   const result = await window.hermesDesktop.api<PaginatedSessions>({
+    ...(scopedProfile ? { profile: scopedProfile } : {}),
     path:
       `/api/profiles/sessions?limit=${limit}&offset=0&min_messages=${Math.max(0, minMessages)}` +
       `&archived=${archived}&order=${order}&profile=${encodeURIComponent(profile)}${sourceParam}${excludeParam}`,
@@ -204,9 +206,12 @@ export function setSessionArchived(id: string, archived: boolean, profile?: stri
   })
 }
 
-export function searchSessions(query: string): Promise<SessionSearchResponse> {
+export function searchSessions(query: string, profile?: string | null): Promise<SessionSearchResponse> {
+  const suffix = profile ? `&profile=${encodeURIComponent(profile)}` : ''
+
   return window.hermesDesktop.api<SessionSearchResponse>({
-    path: `/api/sessions/search?q=${encodeURIComponent(query)}`
+    ...(profile ? { profile } : {}),
+    path: `/api/sessions/search?q=${encodeURIComponent(query)}${suffix}`
   })
 }
 

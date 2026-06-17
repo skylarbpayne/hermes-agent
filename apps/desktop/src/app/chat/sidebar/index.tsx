@@ -475,7 +475,7 @@ export function ChatSidebar({
     let cancelled = false
 
     const id = window.setTimeout(() => {
-      void searchSessions(trimmedQuery)
+      void searchSessions(trimmedQuery, showAllProfiles ? null : profileScope)
         .then(res => {
           if (!cancelled) {
             setServerMatches(res.results)
@@ -488,7 +488,7 @@ export function ChatSidebar({
       cancelled = true
       window.clearTimeout(id)
     }
-  }, [trimmedQuery])
+  }, [trimmedQuery, showAllProfiles, profileScope])
 
   const searchResults = useMemo(() => {
     if (!trimmedQuery) {
