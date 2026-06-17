@@ -414,6 +414,17 @@ export function ChatSidebar({
     () => (showAllProfiles ? sessions : sessions.filter(s => normalizeProfileKey(s.profile) === profileScope)),
     [sessions, showAllProfiles, profileScope]
   )
+  const visibleCronSessions = useMemo(
+    () => (showAllProfiles ? cronSessions : cronSessions.filter(s => normalizeProfileKey(s.profile) === profileScope)),
+    [cronSessions, showAllProfiles, profileScope]
+  )
+  const visibleMessagingSessions = useMemo(
+    () =>
+      showAllProfiles
+        ? messagingSessions
+        : messagingSessions.filter(s => normalizeProfileKey(s.profile) === profileScope),
+    [messagingSessions, showAllProfiles, profileScope]
+  )
 
   // Agent session order is pinned to creation time (started_at), NOT activity —
   // a new message must never float a session to the top. Position only changes
@@ -433,7 +444,7 @@ export function ChatSidebar({
     // Cron sessions are listed separately but can still be pinned, so index
     // them too — otherwise a pinned cron job can't resolve into the Pinned
     // section. Recents take precedence on id collisions (set last).
-    for (const s of [...cronSessions, ...visibleSessions]) {
+    for (const s of [...visibleCronSessions, ...visibleSessions]) {
       map.set(s.id, s)
 
       if (s._lineage_root_id && !map.has(s._lineage_root_id)) {
@@ -442,7 +453,7 @@ export function ChatSidebar({
     }
 
     return map
-  }, [visibleSessions, cronSessions])
+  }, [visibleSessions, visibleCronSessions])
 
   const pinnedSessions = useMemo(() => {
     const seen = new Set<string>()
@@ -618,13 +629,13 @@ export function ChatSidebar({
   // within a platform by recency. Per-platform totals (when a "load more" has
   // resolved them) drive the count + whether more remain on disk.
   const messagingGroups = useMemo<MessagingSection[]>(() => {
-    if (!messagingSessions.length) {
+    if (!visibleMessagingSessions.length) {
       return []
     }
 
     const bySource = new Map<string, SessionInfo[]>()
 
-    for (const session of messagingSessions) {
+    for (const session of visibleMessagingSessions) {
       const sourceId = normalizeSessionSource(session.source)
 
       if (!sourceId) {
@@ -654,7 +665,7 @@ export function ChatSidebar({
         }
       })
       .sort((a, b) => sessionTime(b.sessions[0]) - sessionTime(a.sessions[0]))
-  }, [messagingSessions, messagingPlatformTotals, messagingTruncated])
+  }, [visibleMessagingSessions, messagingPlatformTotals, messagingTruncated])
 
   // ALL-profiles view: one collapsible group per profile, color on the header
   // (not on every row). Default profile floats to the top, the rest alpha.

@@ -205,6 +205,7 @@ export function DesktopController() {
   const terminalTakeover = useStore($terminalTakeover)
   const panesFlipped = useStore($panesFlipped)
   const profileScope = useStore($profileScope)
+  const sessionProfile = profileScope === ALL_PROFILES ? 'all' : profileScope
   // Below SIDEBAR_COLLAPSE_BREAKPOINT_PX there's no room for a docked rail —
   // collapse both sidebars (without touching their stored open state) so the
   // hover-reveal overlay becomes the way in. Restores once it's wide again.
@@ -350,7 +351,7 @@ export function DesktopController() {
   // still resolves into the Pinned section via sessionByAnyId.
   const refreshCronSessions = useCallback(async () => {
     try {
-      const { sessions } = await listAllProfileSessions(CRON_SECTION_LIMIT, 1, 'exclude', 'recent', 'all', {
+      const { sessions } = await listAllProfileSessions(CRON_SECTION_LIMIT, 1, 'exclude', 'recent', sessionProfile, {
         source: 'cron'
       })
 
@@ -358,7 +359,7 @@ export function DesktopController() {
     } catch {
       // Non-fatal: the cron section just stays empty/stale.
     }
-  }, [])
+  }, [sessionProfile])
 
   // Messaging-platform sessions as their own slice, fetched separately from
   // local recents so each platform renders a self-managed section and never
@@ -366,7 +367,7 @@ export function DesktopController() {
   // seeds every platform; the sidebar splits the rows per source.
   const refreshMessagingSessions = useCallback(async () => {
     try {
-      const result = await listAllProfileSessions(MESSAGING_SECTION_LIMIT, 1, 'exclude', 'recent', 'all', {
+      const result = await listAllProfileSessions(MESSAGING_SECTION_LIMIT, 1, 'exclude', 'recent', sessionProfile, {
         excludeSources: MESSAGING_EXCLUDED_SOURCES
       })
 
@@ -375,13 +376,14 @@ export function DesktopController() {
       const rows = result.sessions.filter(s => isMessagingSource(s.source))
 
       setMessagingSessions(prev => (sameCronSignature(prev, rows) ? prev : rows))
+      setMessagingPlatformTotals({})
       // Hit the cap → at least one platform may have more on disk than loaded,
       // so platform sections offer their own per-platform "load more".
       setMessagingTruncated(result.sessions.length >= MESSAGING_SECTION_LIMIT)
     } catch {
       // Non-fatal: the messaging sections just stay empty/stale.
     }
-  }, [])
+  }, [sessionProfile])
 
   // Page a single platform's section independently (mirrors the per-profile
   // pager): fetch that source's next window and merge it back in place, leaving
@@ -390,7 +392,7 @@ export function DesktopController() {
     const inPlatform = (s: SessionInfo) => normalizeSessionSource(s.source) === platform
     const loaded = $messagingSessions.get().filter(inPlatform).length
 
-    const result = await listAllProfileSessions(loaded + SIDEBAR_SESSIONS_PAGE_SIZE, 1, 'exclude', 'recent', 'all', {
+    const result = await listAllProfileSessions(loaded + SIDEBAR_SESSIONS_PAGE_SIZE, 1, 'exclude', 'recent', sessionProfile, {
       source: platform
     })
 
@@ -403,7 +405,7 @@ export function DesktopController() {
 
     const total = result.total ?? incoming.length
     setMessagingPlatformTotals(prev => ({ ...prev, [platform]: Math.max(total, incoming.length) }))
-  }, [])
+  }, [sessionProfile])
 
   // Cron *jobs* drive the sidebar "Cron jobs" section. Jobs are created
   // synchronously (agent tool call or the cron UI), so refreshing here right
@@ -438,8 +440,6 @@ export function DesktopController() {
       // Scope the fetch to the active profile (not always 'all') so a profile
       // with few recent sessions isn't windowed out of the cross-profile
       // recency page — the empty-history-on-profile-switch bug.
-      const sessionProfile = profileScope === ALL_PROFILES ? 'all' : profileScope
-
       const result = await listAllProfileSessions(limit, 1, 'exclude', 'recent', sessionProfile, {
         excludeSources: SIDEBAR_EXCLUDED_SOURCES
       })
@@ -458,7 +458,7 @@ export function DesktopController() {
     void refreshCronSessions()
     void refreshCronJobs()
     void refreshMessagingSessions()
-  }, [profileScope, refreshCronSessions, refreshCronJobs, refreshMessagingSessions])
+  }, [sessionProfile, refreshCronSessions, refreshCronJobs, refreshMessagingSessions])
 
   const loadMoreSessions = useCallback(() => {
     bumpSessionsLimit()

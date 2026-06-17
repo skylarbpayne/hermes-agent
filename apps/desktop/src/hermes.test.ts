@@ -59,6 +59,18 @@ describe('Hermes REST session helpers', () => {
     )
   })
 
+  it('routes a concrete profile messaging-source session list through that profile backend', async () => {
+    await listAllProfileSessions(50, 1, 'exclude', 'recent', 'palmer', { source: 'slack' })
+
+    expect(api).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/api/profiles/sessions?limit=50&offset=0&min_messages=1&archived=exclude&order=recent&profile=palmer&source=slack',
+        profile: 'palmer',
+        timeoutMs: 60_000
+      })
+    )
+  })
+
   it('routes scoped session search through that profile backend', async () => {
     api.mockResolvedValue({ results: [] })
 
